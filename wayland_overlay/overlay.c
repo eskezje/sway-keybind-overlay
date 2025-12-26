@@ -33,6 +33,97 @@ static size_t shm_size = 0;
 static int width = 600;
 static int height = 400;
 
+static struct wl_seat *seat = NULL;
+static struct wl_keyboard *keyboard = NULL;
+
+static void keyboard_keymap(void* data,
+                            struct wl_keyboard *wl_keyboard,
+                            uint format,
+                            int fd, uint size) {
+    close(fd);
+    (void)data;
+    (void)wl_keyboard;
+    (void)format;
+    (void)size;
+}
+
+static void keyboard_enter(void* data,
+                           struct wl_keyboard* wl_keyboard,
+                           uint serial,
+                           struct wl_surface* surface,
+                           struct wl_array* keys) {
+
+    (void)data;
+    (void)wl_keyboard;
+    (void)serial;
+    (void)surface;
+    (void)keys;
+}
+
+static void keyboard_leave(void* data,
+                           struct wl_keyboard* wl_keyboard, 
+                           uint serial,
+                           struct wl_surface* surface) {
+    (void)data;
+    (void)wl_keyboard;
+    (void)serial;
+    (void)surface;
+}
+
+static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
+                        uint32_t serial, uint32_t time, uint32_t key,
+                        uint32_t state) {
+    (void)wl_keyboard; (void)serial; (void)time;
+    
+    // fprintf(stderr, "Key pressed %u\n", key);
+
+    // kun når key er pressed (ikke released)
+    if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+        // fundet med key pressed ovenfor
+        uint32_t h = 35;
+        uint32_t j = 36;
+        uint32_t k = 37;
+        uint32_t l = 38;
+        uint32_t up = 103;
+        uint32_t down = 108;
+        uint32_t left = 105;
+        uint32_t right = 106;
+        if (key == h || key == j || key == k || key == l ||
+            key == up || key == down || key == left || key == right) {
+            return;
+        }
+        
+        // alle andre keys lukker vinduet
+        wl_display_disconnect(display);
+        exit(0);
+    }
+    (void)data;
+}
+
+static void keyboard_modifiers(void* data,
+                               struct wl_keyboard* wl_keyboard, 
+                               uint serial, 
+                               uint mods_depressed, 
+                               uint mods_latched, 
+                               uint mods_locked, 
+                               uint group) {
+
+    (void)data;
+    (void)wl_keyboard;
+    (void)serial;
+    (void)mods_depressed;
+    (void)mods_latched;
+    (void)mods_locked;
+    (void)group;
+}
+
+static const struct wl_keyboard_listener keyboard_listener = {
+    .keymap = keyboard_keymap,
+    .enter = keyboard_enter,
+    .leave = keyboard_leave,
+    .key = keyboard_key,
+    .modifiers = keyboard_modifiers,
+};
 
 static void layer_closed(void *data,
                          struct zwlr_layer_surface_v1 *lsurf) {
@@ -92,7 +183,7 @@ static void layer_configure(void *data,
     
     width = w;
     height = h;
-    fprintf(stderr, "configure: w=%u h=%u\n", width, height);
+    // fprintf(stderr, "configure: w=%u h=%u\n", width, height);
 
     if (!buffer) {
         buffer = create_buffer((int)w, (int)h);
@@ -147,6 +238,8 @@ static void registry_global(void *data,
 
     } else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
         layer_shell = wl_registry_bind(registry, id, &zwlr_layer_shell_v1_interface, 1);
+    } else if (strcmp(interface, wl_seat_interface.name) == 0) {
+        seat = wl_registry_bind(registry, id, &wl_seat_interface, 1);
     }
 
     (void)version;
@@ -164,6 +257,8 @@ static const struct wl_registry_listener reg_listener = {
     .global_remove = registry_remove,
 };
 
+
+
 int main(void)
 {
     display = wl_display_connect(NULL);
@@ -180,6 +275,19 @@ int main(void)
 
     // Pump events en gang, så compositoren når at annoncere globals
     wl_display_roundtrip(display);
+    // fprintf(stderr, "resultat:\n");
+    // fprintf(stderr, " compositor  = %p\n", (void*)compositor);
+    // fprintf(stderr, " shm         = %p\n", (void*)shm);
+    // fprintf(stderr, " layer_shell = %p\n", (void*)layer_shell);
+    // fprintf(stderr, " seat        = %p\n", (void*)seat);
+
+    if (seat) {
+        keyboard = wl_seat_get_keyboard(seat);
+        // fprintf(stderr, "keyboard = %p\n", (void*)keyboard);
+        if (keyboard) {
+            wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
+        }
+    }
 
     // fprintf(stderr, "resultat:\n");
     // fprintf(stderr, " compositor  = %p\n", (void*)compositor);
@@ -202,11 +310,23 @@ int main(void)
         "layer surface keybinds"
     );
 
+    zwlr_layer_surface_v1_set_keyboard_interactivity(
+        layer_surface, 
+        ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE
+    );
+
     zwlr_layer_surface_v1_set_size(layer_surface, 600, 400);
 
     zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, 0);
     
     zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
+
+    if (seat) {
+        keyboard = wl_seat_get_keyboard(seat);
+        if (keyboard) {
+            wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
+        }
+    }
 
     wl_surface_commit(surface);
 
