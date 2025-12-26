@@ -44,7 +44,7 @@ static void layer_configure(void *data,
     if (height == 0) {
         height = 400;
     }
-    printf("height: %d, width: %d", height, width);
+    fprintf(stderr, "configure: w=%u h=%u\n", width, height);
 
 }
 
@@ -135,6 +135,11 @@ int main(void)
     
     zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
 
+    wl_surface_commit(surface);
+
+    while (wl_display_dispatch(display) != -1) {
+
+    }
 
     wl_display_disconnect(display);
     return 0;
