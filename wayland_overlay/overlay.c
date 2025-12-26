@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+#include <wayland-client-protocol.h>
 #include <wayland-client.h>
 #include "wlr-layer-shell.h"
 
@@ -37,6 +39,45 @@ static void layer_closed(void *data,
     // compositor siger luk
     wl_display_disconnect(display);
     exit(0);
+    (void)data;
+    (void)lsurf;
+}
+
+static struct wl_buffer *create_buffer(int w, int h) {
+    // shm format er ARGB8888, 
+    // så 8 bits per kanal aka 1byte per A, R, G og B
+    int stride = w * 4;
+
+    size_t size = (size_t)stride * (size_t)h;
+    int fd = memfd_create("wayland_shm", 0);
+    if (fd < 0) {
+        fprintf(stderr, "memfd_create failed: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    if (ftruncate(fd, (off_t)size)<0) {
+        fprintf(stderr, "ftruncate failed: %s\n", strerror(errno)); 
+        close(fd);
+        return NULL;   
+    }
+
+    shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (shm_data == MAP_FAILED) {
+        fprintf(stderr, "mmap failed: %s\n", strerror(errno));
+        close(fd);
+        shm_data = NULL;
+        return NULL;
+    }
+
+    struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, (int)size);
+    struct wl_buffer *buf = wl_shm_pool_create_buffer(
+        pool, 0, w, h, stride, WL_SHM_FORMAT_ARGB8888
+    );
+    wl_shm_pool_destroy(pool);
+    close(fd);
+
+    shm_size = size;
+    return buf;
 }
 
 static void layer_configure(void *data,
@@ -53,8 +94,27 @@ static void layer_configure(void *data,
     height = h;
     fprintf(stderr, "configure: w=%u h=%u\n", width, height);
 
-}
+    if (!buffer) {
+        buffer = create_buffer((int)w, (int)h);
+        if (!buffer || !shm_data) {
+            fprintf(stderr, "create_buffer failed\n");
+            return;
+        }
+    }
+    
+    uint32_t *px = (uint32_t *)shm_data;
+    for (int y = 0; y<height; y++) {
+        for (int x = 0; x<width ; x++) {
+            px[y*w +x] = 0xAA222222;
+        }
+    }
 
+    wl_surface_attach(surface, buffer, 0, 0);
+    wl_surface_damage_buffer(surface, 0, 0, w, h);
+    wl_surface_commit(surface);
+     
+    (void)data;
+}
 
 static const struct zwlr_layer_surface_v1_listener layer_listener = {
     .configure = layer_configure,
@@ -88,6 +148,8 @@ static void registry_global(void *data,
     } else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
         layer_shell = wl_registry_bind(registry, id, &zwlr_layer_shell_v1_interface, 1);
     }
+
+    (void)version;
 }
 
 static void registry_remove(void *data,
@@ -139,6 +201,10 @@ int main(void)
         ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,
         "layer surface keybinds"
     );
+
+    zwlr_layer_surface_v1_set_size(layer_surface, 600, 400);
+
+    zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, 0);
     
     zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
 
