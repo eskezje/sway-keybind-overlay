@@ -1,7 +1,6 @@
 #include <wayland-client.h>
 #include "wlr-layer-shell.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,14 +24,32 @@ static struct wl_surface *surface;
 static struct zwlr_layer_surface_v1 *layer_surface;
 
 static void layer_closed(void *data,
-                                 struct zwlr_layer_surface_v1 *lsurf) {
+                         struct zwlr_layer_surface_v1 *lsurf) {
     // compositor siger luk
     wl_display_disconnect(display);
     exit(0);
 }
 
+static void layer_configure(void *data,
+                            struct zwlr_layer_surface_v1 *lsurf,
+                            uint32_t serial,
+                            uint32_t width,
+                            uint32_t height) {
 
-static const struct zwlr_layer_surface_v1_listener *layer_listener = {
+    zwlr_layer_surface_v1_ack_configure(lsurf, serial);
+    
+    if (width == 0) {
+        width = 600;
+    }
+    if (height == 0) {
+        height = 400;
+    }
+    printf("height: %d, width: %d", height, width);
+
+}
+
+
+static const struct zwlr_layer_surface_v1_listener layer_listener = {
     .configure = layer_configure,
     .closed = layer_closed,
 };
@@ -51,8 +68,8 @@ static void registry_global(void *data,
 {
     (void)data;
 
-    // debug: bare for at se hvad der bliver annonceret
-    fprintf(stderr, "global: interface=%s id=%u version=%u\n", interface, id, version);
+    // // debug: bare for at se hvad der bliver annonceret
+    // fprintf(stderr, "global: interface=%s id=%u version=%u\n", interface, id, version);
 
     // hvis det er en service vi vil bruge, så binder vi til den
     if (strcmp(interface, wl_compositor_interface.name) == 0) {
@@ -95,10 +112,10 @@ int main(void)
     // Pump events en gang, så compositoren når at annoncere globals
     wl_display_roundtrip(display);
 
-    fprintf(stderr, "resultat:\n");
-    fprintf(stderr, " compositor  = %p\n", (void*)compositor);
-    fprintf(stderr, " shm         = %p\n", (void*)shm);
-    fprintf(stderr, " layer_shell = %p\n", (void*)layer_shell);
+    // fprintf(stderr, "resultat:\n");
+    // fprintf(stderr, " compositor  = %p\n", (void*)compositor);
+    // fprintf(stderr, " shm         = %p\n", (void*)shm);
+    // fprintf(stderr, " layer_shell = %p\n", (void*)layer_shell);
 
     if (!compositor || !shm || !layer_shell) {
         fprintf(stderr, "Missing globals: compositor=%p shm=%p layer_shell=%p\n",
@@ -116,7 +133,7 @@ int main(void)
         "layer surface keybinds"
     );
     
-    zwlr_layer_surface_v1_add_listener(layer_surface, layer_listener, NULL);
+    zwlr_layer_surface_v1_add_listener(layer_surface, &layer_listener, NULL);
 
 
     wl_display_disconnect(display);
