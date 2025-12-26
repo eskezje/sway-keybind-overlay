@@ -1,3 +1,6 @@
 *.o
 overlay
 wayland_overlay/overlay
+wayland_overlay/mac_includes/
+.DS_Store
+.clangd
