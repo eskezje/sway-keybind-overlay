@@ -3,6 +3,8 @@
 #include <wayland-client.h>
 #include "wlr-layer-shell.h"
 
+#include "../read_sway.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -13,7 +15,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 
 
 // her gemmer vi de “services” vi finder
@@ -329,6 +330,18 @@ int main(void)
     }
 
     wl_surface_commit(surface);
+
+
+    // læser config
+    // vi skal nu printe til vores lærred
+    size_t n = 0;
+    char **lines = get_sway_config_lines(&n);
+
+    // for (size_t i = 0; i<n; i++) {
+    //     fprintf(stderr,"%s", lines[i]);
+    // }
+
+    free_sway_config_lines(lines, n);
 
     while (wl_display_dispatch(display) != -1) {
 

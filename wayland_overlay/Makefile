@@ -3,7 +3,7 @@ CFLAGS ?= -Wall -Wextra -pedantic
 LDFLAGS ?= -lwayland-client
 
 PROGRAM = overlay
-SRCS = overlay.c wlr-layer-shell.c xdg-shell.c
+SRCS = overlay.c wlr-layer-shell.c xdg-shell.c ../read_sway.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
@@ -14,8 +14,7 @@ $(PROGRAM): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) -c $< $(CFLAGS)
+	$(CC) -c $< $(CFLAGS) -o $@
 
 clean:
 	rm -f $(PROGRAM) $(OBJS)
-
