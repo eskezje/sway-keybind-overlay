@@ -1,6 +1,7 @@
 #include <wayland-client.h>
 #include "wlr-layer-shell.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,14 +15,22 @@
 
 
 // her gemmer vi de “services” vi finder
+static struct wl_display *display;
+
 static struct wl_compositor *compositor = NULL;
 static struct wl_shm *shm = NULL;
 static struct zwlr_layer_shell_v1 *layer_shell = NULL;
-struct wl_display *display;
 
+static struct wl_surface *surface = NULL;
+static struct zwlr_layer_surface_v1 *layer_surface = NULL;
 
-static struct wl_surface *surface;
-static struct zwlr_layer_surface_v1 *layer_surface;
+static struct wl_buffer *buffer = NULL;
+static void *shm_data = NULL;
+static size_t shm_size = 0;
+
+static int width = 600;
+static int height = 400;
+
 
 static void layer_closed(void *data,
                          struct zwlr_layer_surface_v1 *lsurf) {
@@ -33,17 +42,15 @@ static void layer_closed(void *data,
 static void layer_configure(void *data,
                             struct zwlr_layer_surface_v1 *lsurf,
                             uint32_t serial,
-                            uint32_t width,
-                            uint32_t height) {
+                            uint32_t w,
+                            uint32_t h) {
 
     zwlr_layer_surface_v1_ack_configure(lsurf, serial);
+    if (w == 0) w = 600;
+    if (h == 0) h = 400;
     
-    if (width == 0) {
-        width = 600;
-    }
-    if (height == 0) {
-        height = 400;
-    }
+    width = w;
+    height = h;
     fprintf(stderr, "configure: w=%u h=%u\n", width, height);
 
 }
